@@ -1,0 +1,161 @@
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: felfel-secret
+data:
+  redis_password: cGFzc3dvcmQ=
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: felfel-app
+  labels:
+    app: felfel-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: felfel-app
+  template:
+    metadata:
+      labels:
+        app: felfel-app
+    spec:
+      containers:
+      - name: felfel-app
+        image: toleksa/felfel-app
+        imagePullPolicy: Always
+        ports:
+        - name: http
+          containerPort: 8080
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 3
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        env:
+        - name: REDIS_USERNAME
+          value: user
+        - name: REDIS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: felfel-secret
+              key: redis_password
+        - name: REDIS_HOST
+          value: felfel-redis
+        - name: REDIS_PORT
+          value: "6379"
+        - name: REDIS_DB
+          value: "0"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: felfel-app
+  labels:
+    app: felfel-app
+spec:
+  selector:
+    app: felfel-app
+  type: ClusterIP
+  ports:
+    - protocol: TCP
+      name: http
+      port: 8080
+      targetPort: 8080
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: felfel-app
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: felfel.example.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: felfel-app
+            port:
+              number: 8080
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: felfel-app
+spec:
+  selector:
+    matchLabels:
+      app: felfel-app
+  endpoints:
+  - interval: 30s
+    port: http
+    path: /metrics
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: felfel-redis
+  labels:
+    app: felfel-redis
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: felfel-redis
+  template:
+    metadata:
+      labels:
+        app: felfel-redis
+    spec:
+      containers:
+      - name: redis
+        image: redis:alpine
+        ports:
+        - containerPort: 6379
+        #TODO: hardcoded password
+        command: ["redis-server"]
+        args: ["--user", "user", "on", ">password", "~*", "allcommands", "--user", "default", "off", "nopass", "nocommands"]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: felfel-redis
+spec:
+  selector:
+    app: felfel-redis
+  ports:
+    - protocol: TCP
+      port: 6379
+      targetPort: 6379
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: prometheus
+  namespace: monitoring
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: prometheus.example.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: prometheus-kube-prometheus-prometheus
+            port:
+              number: 9090
+
