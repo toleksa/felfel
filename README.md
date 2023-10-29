@@ -3,7 +3,7 @@ flask app
 
 ## Steps
 
-Instruction was prepared for Ubuntu 22.04
+Instruction made on Ubuntu 22.04
 
 ### 1
 
@@ -72,11 +72,14 @@ helm install --create-namespace --namespace monitoring prometheus prometheus-com
 kubectl apply -f kube.yaml
 ```
 
+`putty 4L8000 192.168.49.2:80`
+
 Rancher - RKE2:
 ```
 curl -sfL https://get.rke2.io | sudo sh -
-systemctl enable rke2-server.service
-systemctl start rke2-server.service
+sudo systemctl enable rke2-server.service
+sudo systemctl start rke2-server.service
+sudo chmod o+r /etc/rancher/rke2/rke2.yaml
 echo "export PATH=\$PATH:/var/lib/rancher/rke2/bin" >> ~/.bashrc
 echo "export KUBECONFIG=/etc/rancher/rke2/rke2.yaml" >> ~/.bashrc
 echo "alias k='kubectl'" >> ~/.bashrc
